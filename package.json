@@ -1,0 +1,17 @@
+{
+  "name": "52jykyy4jx",
+  "description": null,
+  "version": "0.0.0",
+  "dependencies": {
+    "p5": "0.5.14"
+  },
+  "devDependencies": {
+    "react-scripts": "1.0.0"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test --env=jsdom",
+    "eject": "react-scripts eject"
+  }
+}
