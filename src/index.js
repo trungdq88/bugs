@@ -2,7 +2,7 @@ import p5 from 'p5';
 import { FFNetwork } from './neural-network.js';
 
 const SIZE = 700;
-const BUG_POPULATION = 10;
+const BUG_POPULATION = 50;
 const FOOD_SIZE = 5;
 const BUG_SIZE = 5;
 const BUG_SPEED = 2;
@@ -150,12 +150,15 @@ const sketch = p => {
 
   setInterval(() => {
     foods.push(new Food(p.createVector(p.random(SIZE), p.random(SIZE))));
-  }, 100);
+  }, 1000);
 
   const createBugs = () => {
     bugs = [];
     for (let i = 0; i < BUG_POPULATION; i++) {
       bugs.push(new Bug(p.createVector(p.random(SIZE), p.random(SIZE))));
+    }
+    for (let i = 0; i < BUG_POPULATION; i++) {
+      foods.push(new Food(p.createVector(p.random(SIZE), p.random(SIZE))));
     }
   };
 
