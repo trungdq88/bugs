@@ -2,12 +2,14 @@ import p5 from 'p5';
 import { FFNetwork } from './neural-network.js';
 
 const SIZE = 700;
-const BUG_POPULATION = 50;
+const INITIAL_FOOD_COUNT = 100;
+const BUG_POPULATION = 30;
 const FOOD_SIZE = 5;
 const BUG_SIZE = 5;
 const BUG_SPEED = 2;
-const BUG_MAX_AGE = 2000;
+const BUG_MAX_AGE = 200;
 const BUG_BONUS_AGE = 200;
+const BUG_SMELL_RANGE = 20;
 
 const sketch = p => {
   class Food {
@@ -45,22 +47,25 @@ const sketch = p => {
       const head = this.getHead();
       return (
         foods
+          .filter(food => !food.gone)
           .map((food, index) => ({
             ...food,
-            distance: p5.Vector.sub(food.position, this.position).magSq(),
+            distance: p5.Vector.sub(food.position, this.position).mag(),
             angle: p5.Vector
               .sub(this.position, head)
               .angleBetween(p5.Vector.sub(head, food.position)),
           }))
           // .map(food => {
-          //   if (food.angle <= p.HALF_PI) {
+          //   if (food.angle <= p.HALF_PI || food.distance <= BUG_SMELL_RANGE) {
           //     food.inRange();
           //   } else {
           //     food.outRange();
           //   }
           //   return food;
           // })
-          .filter(food => food.angle <= p.HALF_PI)
+          .filter(
+            food => food.angle <= p.HALF_PI || food.distance <= BUG_SMELL_RANGE,
+          )
           .reduce((prev, curr) => {
             return prev && prev.distance < curr.distance ? prev : curr;
           }, null)
@@ -109,7 +114,8 @@ const sketch = p => {
       }
       this.age += 1;
       const closestFood = this.getClosestFood();
-      if (closestFood && closestFood.distance < (FOOD_SIZE + BUG_SIZE) / 2) {
+      // console.log(closestFood && closestFood.distance);
+      if (closestFood && closestFood.distance < FOOD_SIZE + BUG_SIZE) {
         this.age -= BUG_BONUS_AGE;
         closestFood.eaten();
       }
@@ -157,7 +163,7 @@ const sketch = p => {
     for (let i = 0; i < BUG_POPULATION; i++) {
       bugs.push(new Bug(p.createVector(p.random(SIZE), p.random(SIZE))));
     }
-    for (let i = 0; i < BUG_POPULATION; i++) {
+    for (let i = 0; i < INITIAL_FOOD_COUNT; i++) {
       foods.push(new Food(p.createVector(p.random(SIZE), p.random(SIZE))));
     }
   };
