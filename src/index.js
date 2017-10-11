@@ -1,8 +1,11 @@
 import p5 from 'p5';
 import { FFNetwork } from './neural-network.js';
 
+const NETWORK_STRUCTURE = [2, 100, 2];
+const MUTATION_RATE = 0.01;
+const ELITISM_RATE = 0.4;
 const SIZE = 700;
-const INITIAL_FOOD_COUNT = 100;
+const INITIAL_FOOD_COUNT = 200;
 const BUG_POPULATION = 30;
 const FOOD_SIZE = 5;
 const BUG_SIZE = 5;
@@ -11,6 +14,7 @@ const BUG_MAX_AGE = 1000;
 const BUG_SMELL_RANGE = 20;
 const DEFAULT_BUG_ENERGY = 200;
 const FOOD_ENERGY = 50;
+const FOOD_DROP_FRAME = 10;
 
 const sketch = p => {
   class Food {
@@ -41,9 +45,12 @@ const sketch = p => {
     dead = false;
     age = 0;
     energy = DEFAULT_BUG_ENERGY;
-    brain = new FFNetwork([2, 100, 2]);
-    constructor(position, foods = []) {
+    brain = new FFNetwork(NETWORK_STRUCTURE);
+    constructor(position, brain) {
       this.position = position;
+      if (brain) {
+        this.brain = brain;
+      }
     }
     getClosestFood = () => {
       const head = this.getHead();
@@ -155,32 +162,133 @@ const sketch = p => {
     };
   }
 
-  const foods = [];
+  let generationNo = 1;
+  let foods = [];
   let bugs = [];
-
-  setInterval(() => {
-    foods.push(new Food(p.createVector(p.random(SIZE), p.random(SIZE))));
-  }, 1000);
+  let time = 0;
 
   const createBugs = () => {
     bugs = [];
     for (let i = 0; i < BUG_POPULATION; i++) {
       bugs.push(new Bug(p.createVector(p.random(SIZE), p.random(SIZE))));
     }
+  };
+
+  const dropFood = () => {
+    foods.push(new Food(p.createVector(p.random(SIZE), p.random(SIZE))));
+  };
+
+  const createFoods = () => {
+    foods = [];
     for (let i = 0; i < INITIAL_FOOD_COUNT; i++) {
-      foods.push(new Food(p.createVector(p.random(SIZE), p.random(SIZE))));
+      dropFood();
     }
   };
 
   const endGeneration = () => {
-    console.log(bugs);
+    const newBugs = [];
     p.noLoop();
+
+    // Calculate fitness
+    const totalAge = bugs.map(bug => bug.age).reduce((a, b) => a + b);
+    for (let i = 0; i < bugs.length; i++) {
+      bugs[i].fitness = bugs[i].age / totalAge;
+    }
+    bugs.sort((a, b) => (a.fitness < b.fitness ? 1 : -1));
+
+    const highestFitness = Math.max.apply(Math, bugs.map(bug => bug.fitness));
+    const averageFitness =
+      bugs.map(bug => bug.fitness).reduce((a, b) => a + b) / bugs.length;
+
+    console.log({
+      highestFitness,
+      averageFitness,
+    });
+
+    // Calculate Accumulated Fitness (for selection)
+    bugs[0].accumulatedFitness = bugs[0].fitness;
+    for (let i = 1; i < bugs.length; i++) {
+      bugs[i].accumulatedFitness =
+        bugs[i].fitness + bugs[i - 1].accumulatedFitness;
+    }
+
+    console.log(bugs);
+
+    // Elitism
+    const elitismCount = Math.round(bugs.length * ELITISM_RATE);
+    for (let i = 0; i < elitismCount; i++) {
+      newBugs.push(
+        new Bug(
+          p.createVector(p.random(SIZE), p.random(SIZE)),
+          new FFNetwork(NETWORK_STRUCTURE, bugs[i].brain.getStructure()),
+        ),
+      );
+    }
+
+    // Cross over
+    const crossOverCount = bugs.length - elitismCount;
+    const selection = () => {
+      // Selection method:
+      // https://en.wikipedia.org/wiki/Selection_(genetic_algorithm)
+      const r = Math.random();
+      for (let i = 0; i < bugs.length; i++) {
+        if (bugs[i].accumulatedFitness > r) {
+          return bugs[i];
+        }
+      }
+    };
+    for (let i = 0; i < crossOverCount; i++) {
+      const parentA = selection();
+      const parentB = selection();
+      const parentAStructure = parentA.brain.getStructure();
+      const parentBStructure = parentB.brain.getStructure();
+      // Single point cross over
+      // https://en.wikipedia.org/wiki/Crossover_(genetic_algorithm)
+      const childStructure = [];
+      const crossOverPoint = p.random(0, parentAStructure.length - 1);
+      for (let j = 0; j < parentAStructure.length; j++) {
+        if (j < crossOverPoint) {
+          childStructure.push(parentAStructure[j]);
+        } else {
+          childStructure.push(parentBStructure[j]);
+        }
+      }
+      const child = new Bug(
+        p.createVector(p.random(SIZE), p.random(SIZE)),
+        new FFNetwork(NETWORK_STRUCTURE, childStructure),
+      );
+      newBugs.push(child);
+    }
+
+    // Mutation
+    for (let i = 0; i < newBugs.length; i++) {
+      if (Math.random() < MUTATION_RATE) {
+        const data = newBugs[i].brain.getStructure();
+        const mutationPoint = p.random(0, data.length - 1);
+        data[mutationPoint] = Math.random();
+        newBugs[i].brain.setStructure(data);
+      }
+    }
+
+    // Mutation
+    bugs = newBugs;
+    setTimeout(() => {
+      createNextGeneration();
+    }, 1000);
+  };
+
+  const createNextGeneration = () => {
+    console.log('Generation', ++generationNo);
+    time = 0;
+    createFoods();
+    p.loop();
   };
 
   p.setup = () => {
     p.createCanvas(SIZE, SIZE);
     p.frameRate(30);
     createBugs();
+    createFoods();
   };
 
   p.draw = function() {
@@ -196,6 +304,9 @@ const sketch = p => {
       bug.update();
       bug.draw();
     });
+    if (++time % FOOD_DROP_FRAME === 0) {
+      dropFood();
+    }
   };
 };
 

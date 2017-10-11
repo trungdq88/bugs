@@ -23,7 +23,7 @@ export class Layer {
 export class FFNetwork {
   layers = [];
 
-  constructor(structure = []) {
+  constructor(structure = [], data) {
     for (let i = 0; i < structure.length; i++) {
       const isLastLayer = i === structure.length - 1;
       const neuronCount = structure[i];
@@ -33,6 +33,9 @@ export class FFNetwork {
         const nextLayerNeuronCount = structure[i + 1];
         this.layers.push(new Layer(neuronCount, nextLayerNeuronCount));
       }
+    }
+    if (data) {
+      this.setStructure(data); // TODO: structure -> data
     }
   }
 
