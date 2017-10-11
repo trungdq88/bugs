@@ -7,9 +7,10 @@ const BUG_POPULATION = 30;
 const FOOD_SIZE = 5;
 const BUG_SIZE = 5;
 const BUG_SPEED = 2;
-const BUG_MAX_AGE = 200;
-const BUG_BONUS_AGE = 200;
+const BUG_MAX_AGE = 1000;
 const BUG_SMELL_RANGE = 20;
+const DEFAULT_BUG_ENERGY = 200;
+const FOOD_ENERGY = 50;
 
 const sketch = p => {
   class Food {
@@ -39,6 +40,7 @@ const sketch = p => {
     position = p.createVector(0, 0);
     dead = false;
     age = 0;
+    energy = DEFAULT_BUG_ENERGY;
     brain = new FFNetwork([2, 100, 2]);
     constructor(position, foods = []) {
       this.position = position;
@@ -107,16 +109,18 @@ const sketch = p => {
         this.position.x > SIZE ||
         this.position.y < 0 ||
         this.position.y > SIZE ||
-        this.age > BUG_MAX_AGE
+        this.age > BUG_MAX_AGE ||
+        this.energy <= 0
       ) {
         this.dead = true;
         return;
       }
       this.age += 1;
+      this.energy -= 1;
       const closestFood = this.getClosestFood();
       // console.log(closestFood && closestFood.distance);
       if (closestFood && closestFood.distance < FOOD_SIZE + BUG_SIZE) {
-        this.age -= BUG_BONUS_AGE;
+        this.energy += FOOD_ENERGY;
         closestFood.eaten();
       }
       const leftAntena = this.getLeftAntena();
@@ -168,6 +172,11 @@ const sketch = p => {
     }
   };
 
+  const endGeneration = () => {
+    console.log(bugs);
+    p.noLoop();
+  };
+
   p.setup = () => {
     p.createCanvas(SIZE, SIZE);
     p.frameRate(30);
@@ -176,8 +185,14 @@ const sketch = p => {
 
   p.draw = function() {
     p.background(200);
-    foods.filter(food => !food.gone).forEach(food => food.draw());
-    bugs.filter(bug => !bug.dead).forEach(bug => {
+    const remainingFoods = foods.filter(food => !food.gone);
+    const remainingBugs = bugs.filter(bug => !bug.dead);
+    if (remainingBugs.length === 0) {
+      endGeneration();
+      return;
+    }
+    remainingFoods.forEach(food => food.draw());
+    remainingBugs.forEach(bug => {
       bug.update();
       bug.draw();
     });
