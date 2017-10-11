@@ -110,4 +110,29 @@ export class FFNetwork {
       });
     });
   }
+
+  getStructure() {
+    const result = [];
+    this.layers.forEach(layer => {
+      layer.neurons.forEach(neuron => {
+        neuron.dendrite.forEach(weight => result.push(weight));
+        result.push(neuron.bias);
+      });
+    });
+    return result;
+  }
+
+  setStructure(structure) {
+    let i = 0;
+    this.layers.forEach(layer => {
+      layer.neurons.forEach(neuron => {
+        neuron.dendrite.forEach((_, index) => {
+          neuron.dendrite[index] = structure[i];
+          i += 1;
+        });
+        neuron.bias = structure[i];
+        i += 1;
+      });
+    });
+  }
 }
