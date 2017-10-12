@@ -1,5 +1,6 @@
 import p5 from 'p5';
 import { FFNetwork } from './neural-network.js';
+import generation100 from './train-data/generation-100.json';
 
 const NETWORK_STRUCTURE = [2, 100, 2];
 const MUTATION_RATE = 0.01;
@@ -17,6 +18,7 @@ const FOOD_ENERGY = 50;
 const FOOD_DROP_FRAME = 10;
 
 const sketch = p => {
+  window.p = p;
   class Food {
     position = p.createVector(0, 0);
     gone = false;
@@ -44,6 +46,7 @@ const sketch = p => {
     position = p.createVector(0, 0);
     dead = false;
     age = 0;
+    fitness = 0;
     energy = DEFAULT_BUG_ENERGY;
     brain = new FFNetwork(NETWORK_STRUCTURE);
     constructor(position, brain) {
@@ -111,23 +114,18 @@ const sketch = p => {
       p.ellipse(this.position.x, this.position.y, BUG_SIZE);
     };
     update = () => {
-      if (
-        this.position.x < 0 ||
-        this.position.x > SIZE ||
-        this.position.y < 0 ||
-        this.position.y > SIZE ||
-        this.age > BUG_MAX_AGE ||
-        this.energy <= 0
-      ) {
+      if (this.age > BUG_MAX_AGE || this.energy <= 0) {
         this.dead = true;
         return;
       }
       this.age += 1;
+      this.fitness += 1;
       this.energy -= 1;
       const closestFood = this.getClosestFood();
       // console.log(closestFood && closestFood.distance);
       if (closestFood && closestFood.distance < FOOD_SIZE + BUG_SIZE) {
         this.energy += FOOD_ENERGY;
+        this.fitness += 50;
         closestFood.eaten();
       }
       const leftAntena = this.getLeftAntena();
@@ -167,10 +165,14 @@ const sketch = p => {
   let bugs = [];
   let time = 0;
 
-  const createBugs = () => {
+  const createBugs = data => {
     bugs = [];
     for (let i = 0; i < BUG_POPULATION; i++) {
       bugs.push(new Bug(p.createVector(p.random(SIZE), p.random(SIZE))));
+      if (data) {
+        console.log('Loaded data', data);
+        bugs[i].brain.setStructure(data[i]);
+      }
     }
   };
 
@@ -187,18 +189,21 @@ const sketch = p => {
 
   const endGeneration = () => {
     const newBugs = [];
-    p.noLoop();
 
     // Calculate fitness
-    const totalAge = bugs.map(bug => bug.age).reduce((a, b) => a + b);
+    const totalFitness = bugs.map(bug => bug.age).reduce((a, b) => a + b);
     for (let i = 0; i < bugs.length; i++) {
-      bugs[i].fitness = bugs[i].age / totalAge;
+      bugs[i].normalizedFitness = bugs[i].fitness / totalFitness;
     }
-    bugs.sort((a, b) => (a.fitness < b.fitness ? 1 : -1));
+    bugs.sort((a, b) => (a.normalizedFitness < b.normalizedFitness ? 1 : -1));
 
-    const highestFitness = Math.max.apply(Math, bugs.map(bug => bug.fitness));
+    const highestFitness = Math.max.apply(
+      Math,
+      bugs.map(bug => bug.normalizedFitness),
+    );
     const averageFitness =
-      bugs.map(bug => bug.fitness).reduce((a, b) => a + b) / bugs.length;
+      bugs.map(bug => bug.normalizedFitness).reduce((a, b) => a + b) /
+      bugs.length;
 
     console.log({
       highestFitness,
@@ -206,10 +211,10 @@ const sketch = p => {
     });
 
     // Calculate Accumulated Fitness (for selection)
-    bugs[0].accumulatedFitness = bugs[0].fitness;
+    bugs[0].accumulatedFitness = bugs[0].normalizedFitness;
     for (let i = 1; i < bugs.length; i++) {
       bugs[i].accumulatedFitness =
-        bugs[i].fitness + bugs[i - 1].accumulatedFitness;
+        bugs[i].normalizedFitness + bugs[i - 1].accumulatedFitness;
     }
 
     console.log(bugs);
@@ -233,6 +238,7 @@ const sketch = p => {
       const r = Math.random();
       for (let i = 0; i < bugs.length; i++) {
         if (bugs[i].accumulatedFitness > r) {
+          // console.log('selected bug with fitness', bugs[i].fitness, r);
           return bugs[i];
         }
       }
@@ -272,42 +278,55 @@ const sketch = p => {
 
     // Mutation
     bugs = newBugs;
-    setTimeout(() => {
-      createNextGeneration();
-    }, 1000);
+    createNextGeneration();
   };
 
   const createNextGeneration = () => {
     console.log('Generation', ++generationNo);
     time = 0;
     createFoods();
-    p.loop();
   };
 
-  p.setup = () => {
-    p.createCanvas(SIZE, SIZE);
-    p.frameRate(30);
-    createBugs();
+  const setup = data => {
+    createBugs(data);
     createFoods();
   };
 
-  p.draw = function() {
-    p.background(200);
+  const loop = renderer => {
     const remainingFoods = foods.filter(food => !food.gone);
     const remainingBugs = bugs.filter(bug => !bug.dead);
     if (remainingBugs.length === 0) {
       endGeneration();
       return;
     }
-    remainingFoods.forEach(food => food.draw());
+    remainingFoods.forEach(food => renderer(food));
     remainingBugs.forEach(bug => {
       bug.update();
-      bug.draw();
+      renderer(bug);
     });
     if (++time % FOOD_DROP_FRAME === 0) {
       dropFood();
     }
   };
+  //
+  window.train = () => {
+    setup();
+    while (generationNo < 10) {
+      loop(() => {});
+    }
+    document.write(JSON.stringify(bugs.map(bug => bug.brain.getStructure())));
+  };
+
+  // p.setup = () => {
+  //   p.createCanvas(SIZE, SIZE);
+  //   p.frameRate(30);
+  //   setup();
+  // };
+  //
+  // p.draw = function() {
+  //   p.background(200);
+  //   loop(obj => obj.draw());
+  // };
 };
 
 new p5(sketch);
